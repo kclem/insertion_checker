@@ -27,17 +27,10 @@ def main():
     else:
         logger.setLevel(logging.INFO)
 
-
     # create console handler and set level to debug
     ch = logging.StreamHandler()
-
-    # create formatter
     formatter = logging.Formatter('%(message)s')
-
-    # add formatter to ch
     ch.setFormatter(formatter)
-
-    # add ch to logger
     logger.addHandler(ch)
 
     # check if input files exist
@@ -57,6 +50,19 @@ def main():
     # merge paired end reads
     input_fastq = args.fastq_r1
     if args.fastq_r2 is not None:
+        fastp_status = sb.run('fastp --version', shell=True, stdout=sb.PIPE, stderr=sb.STDOUT)
+        if fastp_status.returncode:
+            logger.critical('Fastp not installed. Please install fastp to merge paired end reads.')
+            return
+        fastp_version_args = fastp_status.stdout.decode('utf-8').split(' ')[1].strip().split(".")
+        if len(fastp_version_args) < 3:
+            logger.critical('Fastp version is not in the correct format. Please update fastp to merge paired end reads.')
+            return
+        print('fastqp version: "{}"'.format(fastp_version_args))
+        if int(fastp_version_args[0]) <= 0 and int(fastp_version_args[1]) <= 19 and int(fastp_version_args[2]) < 8:
+            logger.critical('fastp version is less than 0.19.8. Please update fastp to merge paired end reads.')
+            return
+
         logger.debug('Merging paired end reads...')
         input_fastq = output_file+".merged.fq"
         unmerged_r1 = output_file+".merged_r1.fq"
@@ -71,6 +77,7 @@ def main():
                 min_overlap=args.min_paired_end_reads_overlap,
                 html_report=output_file + '.fastp_report.html',
             )
+        logger.debug('Running command: ' + merge_cmd)
 
         fastp_status = sb.call(merge_cmd, shell=True)
         if fastp_status:
@@ -130,6 +137,10 @@ def main():
     else:
         fin = open(input_fastq, 'r')
 
+    if args.debug:
+        bad_output_file = output_file + '.barcode_unknown.fq'
+        bad_out = open(bad_output_file,'w')
+
     while(True):
         info_line = fin.readline()
         seq_line = fin.readline()
@@ -151,7 +162,7 @@ def main():
                 invalid_barcode_count += 1
                 invalid_barcode_counts[barcode] += 1
         elif rc_match:
-            barcode = reverse_complement(match.group(1))
+            barcode = reverse_complement(rc_match.group(1))
             barcode_counts[barcode] += 1
             if barcode in valid_barcodes:
                 valid_barcode_count_rc += 1
@@ -161,7 +172,11 @@ def main():
 
         else:
             no_barcode_count += 1
+            if args.debug:
+                bad_out.write(info_line+seq_line+plus_line+qual_line)
     fin.close()
+    if args.debug:
+        bad_out.close()
 
     barcode_df['Count'] = [barcode_counts[x] for x in barcode_df['Barcode']]
 
@@ -178,6 +193,9 @@ def main():
     logger.info(f'Finished processing {read_seq_count} reads (valid barcodes: {valid_barcode_count} ({valid_barcode_count_fw} forward, {valid_barcode_count_rc} reverse), invalid barcodes: {invalid_barcode_count}, unidentified reads: {no_barcode_count})')
     logger.info(f'Printed {valid_counts} valid barcode counts to {output_file}')
     logger.info(f'Printed {invalid_counts} invalid barcodes to {invalid_barcode_file}')
+    if args.debug:
+        logger.info(f'Printed {no_barcode_count} reads with no barcodes to {bad_output_file}')
+
 
 
 if __name__ == '__main__':
