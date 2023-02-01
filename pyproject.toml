@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "Insertion_checker"
+version = "0.0.1"
+authors = [
+  { name="Kendell Clement", email="kclement@mgh.harvard.edu" },
+]
+description = "A package for parsing barcodes from MOSAIC libraries"
+readme = "README.md"
+requires-python = ">=3.7"
+classifiers = [
+    "Programming Language :: Python :: 3",
+]
+
+dependencies = [
+   "pandas",
+   "fastp",
+	
+]
+
+[project.urls]
+"Homepage" = "https://github.com/kclem/insertion_checker"
+"Bug Tracker" = "https://github.com/kclem/insertion_checker/issues"
