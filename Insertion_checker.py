@@ -103,16 +103,24 @@ def main():
     right_bases_to_check = args.spacer_seq[args.cut_offset:]
     right_bases_to_check = right_bases_to_check[:args.num_bp_post]
 
+    def reverse_complement(seq):
+        return seq.translate(str.maketrans('ATGC', 'TACG'))[::-1]
+
     logger.debug('spacer seq: ' + args.spacer_seq)
     logger.debug('left bases: ' + str(left_bases_to_check) + ' right bases: ' + str(right_bases_to_check))
     logger.debug('barcode regex: ' + f'{left_bases_to_check}([ATGC]{{{max(barcode_lens)}}}){right_bases_to_check}')
 
+    right_bases_to_check_rc = reverse_complement(right_bases_to_check)
+    left_bases_to_check_rc = reverse_complement(left_bases_to_check)
+
     barcode_regex = re.compile(f'{left_bases_to_check}([ATGC]{{{max(barcode_lens)}}}){right_bases_to_check}')
+    rc_barcode_regex = re.compile(f'{right_bases_to_check_rc}([ATGC]{{{max(barcode_lens)}}}){left_bases_to_check_rc}')
 
     #read fastq file
     no_barcode_count = 0
     invalid_barcode_count = 0 #barcode is correct length but not in barcode list
-    valid_barcode_count = 0
+    valid_barcode_count_fw = 0
+    valid_barcode_count_rc = 0
 
     read_seq_count = 0
     barcode_counts = defaultdict(int)
@@ -133,11 +141,20 @@ def main():
 
         #check to see if sequence contains barcode_regex
         match = barcode_regex.search(seq_line)
+        rc_match = rc_barcode_regex.search(seq_line)
         if match:
             barcode = match.group(1)
             barcode_counts[barcode] += 1
             if barcode in valid_barcodes:
-                valid_barcode_count += 1
+                valid_barcode_count_fw += 1
+            else:
+                invalid_barcode_count += 1
+                invalid_barcode_counts[barcode] += 1
+        elif rc_match:
+            barcode = reverse_complement(match.group(1))
+            barcode_counts[barcode] += 1
+            if barcode in valid_barcodes:
+                valid_barcode_count_rc += 1
             else:
                 invalid_barcode_count += 1
                 invalid_barcode_counts[barcode] += 1
@@ -157,7 +174,8 @@ def main():
 
     invalid_counts = len(invalid_barcode_counts.keys())
     valid_counts = len(barcode_counts.keys())
-    logger.info(f'Finished processing {read_seq_count} reads (valid barcodes: {valid_barcode_count}, invalid barcodes: {invalid_barcode_count}, unidentified reads: {no_barcode_count})')
+    valid_barcode_count = valid_barcode_count_fw + valid_barcode_count_rc
+    logger.info(f'Finished processing {read_seq_count} reads (valid barcodes: {valid_barcode_count} ({valid_barcode_count_fw} forward, {valid_barcode_count_rc} reverse), invalid barcodes: {invalid_barcode_count}, unidentified reads: {no_barcode_count})')
     logger.info(f'Printed {valid_counts} valid barcode counts to {output_file}')
     logger.info(f'Printed {invalid_counts} invalid barcodes to {invalid_barcode_file}')
 
