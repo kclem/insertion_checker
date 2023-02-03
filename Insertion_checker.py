@@ -12,7 +12,7 @@ def main():
     parser.add_argument('-s', '--spacer_seq', type=str, help='Spacer sequence', required=True)
     parser.add_argument('-c', '--cut_offset', type=int, help='Cut offset in spacer where insertions are to be counted', default=-3)
     parser.add_argument('-b','--barcode_file', type=str, help='Barcode sequence file', required=True)
-    parser.add_argument('-o', '--output', type=int, help='Output file', default=None)
+    parser.add_argument('-o', '--output', type=str, help='Output file', default=None)
     parser.add_argument('-r1', '--fastq_r1', type=str, help='Input fastq r1 file', required=True)
     parser.add_argument('-r2', '--fastq_r2', type=str, help='Input fastq r2 file', default=None)
     parser.add_argument('--num_bp_pre', type=int, help='Number of bases from the spacer pre-cut to match', default=6)
@@ -151,7 +151,7 @@ def main():
                 invalid_barcode_count += 1
                 invalid_barcode_counts[barcode] += 1
         elif rc_match:
-            barcode = reverse_complement(match.group(1))
+            barcode = reverse_complement(rc_match.group(1))
             barcode_counts[barcode] += 1
             if barcode in valid_barcodes:
                 valid_barcode_count_rc += 1
@@ -178,6 +178,12 @@ def main():
     logger.info(f'Finished processing {read_seq_count} reads (valid barcodes: {valid_barcode_count} ({valid_barcode_count_fw} forward, {valid_barcode_count_rc} reverse), invalid barcodes: {invalid_barcode_count}, unidentified reads: {no_barcode_count})')
     logger.info(f'Printed {valid_counts} valid barcode counts to {output_file}')
     logger.info(f'Printed {invalid_counts} invalid barcodes to {invalid_barcode_file}')
+
+    info_file = output_file + '.info.txt'
+    with open(info_file, 'w') as fout:
+        fout.write("read_seq_count\tvalid_barcode_count\tvalid_barcode_count_fw\tvalid_barcode_count_rc\tinvalid_barcode_count\tunique_invalid_count\tno_barcode_count\n")
+        fout.write(f'{read_seq_count}\t{valid_barcode_count}\t{valid_barcode_count_fw}\t{valid_barcode_count_rc}\t{invalid_barcode_count}\t{invalid_counts}\t{no_barcode_count}\n')
+    logger.info(f'Printed information to {info_file}')
 
 
 if __name__ == '__main__':
